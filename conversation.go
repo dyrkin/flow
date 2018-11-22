@@ -25,12 +25,13 @@ type ask struct {
 	askFn askFunction
 }
 
-func Ask(askFn askFunction) *ask {
-	return &ask{askFn}
+func Ask(askFn askFunction) *Step {
+	return &Step{askFn: askFn}
 }
 
-func (ask *ask) OnReply(replyFn ReplyFunction) *Step {
-	return &Step{ask.askFn, replyFn}
+func (step *Step) OnReply(replyFn ReplyFunction) *Step {
+	step.replyFn = replyFn
+	return step
 }
 
 func OnReply(replyFn ReplyFunction) *Step {
@@ -72,17 +73,19 @@ func StartWithData(initialStep *Step, initialData Data) *Conversation {
 				step.askFn(currentData)
 			}
 			reply := <-conversation.replyChan
+			if step.replyFn == nil {
+				return
+			}
 			nextStep := step.replyFn(&Event{reply, currentData})
 			if nextStep.data != nil {
 				currentData = nextStep.data
 			}
-			if nextStep.step != nil {
-				go func() {
-					conversation.askChan <- nextStep.step
-				}()
-			} else {
+			if nextStep.step == nil {
 				return
 			}
+			go func() {
+				conversation.askChan <- nextStep.step
+			}()
 		}
 	}
 	go processor()

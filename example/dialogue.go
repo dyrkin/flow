@@ -83,12 +83,10 @@ func newHuman(botChan chan string) *Conversation {
 			return DefaultHandler()(event)
 		})
 
-	//send password to bot and stop the flow
+	//just send a password to the bot and stop the flow
 	sendPassword =
 		Ask(func(data Data) {
 			botChan <- "some password"
-		}).OnReply(func(event *Event) *NextStep {
-			return End()
 		})
 
 	return Start(askRegister)
