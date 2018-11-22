@@ -18,8 +18,8 @@ func newBot(humanChan chan string) *Conversation {
 	var askPassword *Step
 
 	//wait for command from user
-	awaitCommand = OnReply(
-		func(event *Event) *NextStep {
+	awaitCommand =
+		OnReply(func(event *Event) *NextStep {
 			switch event.Message {
 			case "register":
 				return Goto(askEmail).Using(&UserData{})
@@ -28,11 +28,10 @@ func newBot(humanChan chan string) *Conversation {
 		})
 
 	//ask email
-	askEmail = Ask(
-		func(data Data) {
+	askEmail =
+		Ask(func(data Data) {
 			humanChan <- "please send your email"
-		}).OnReply(
-		func(event *Event) *NextStep {
+		}).OnReply(func(event *Event) *NextStep {
 			email := event.Message.(string)
 			userData := event.Data.(*UserData)
 			userData.login = email
@@ -40,15 +39,16 @@ func newBot(humanChan chan string) *Conversation {
 		})
 
 	//ask password
-	askPassword = Ask(func(data Data) {
-		humanChan <- "please send your password"
-	}).OnReply(func(event *Event) *NextStep {
-		password := event.Message.(string)
-		userData := event.Data.(*UserData)
-		userData.password = password
-		fmt.Printf("Complete data: %q", userData)
-		return End().Using(userData)
-	})
+	askPassword =
+		Ask(func(data Data) {
+			humanChan <- "please send your password"
+		}).OnReply(func(event *Event) *NextStep {
+			password := event.Message.(string)
+			userData := event.Data.(*UserData)
+			userData.password = password
+			fmt.Printf("Complete data: %q", userData)
+			return End().Using(userData)
+		})
 
 	return Start(awaitCommand)
 }
@@ -60,36 +60,36 @@ func newHuman(botChan chan string) *Conversation {
 	var sendPassword *Step
 
 	//send regiter command to bot and process response
-	askRegister = Ask(
-		func(data Data) {
+	askRegister =
+		Ask(func(data Data) {
 			botChan <- "register"
-		}).OnReply(
-		func(event *Event) *NextStep {
+		}).OnReply(func(event *Event) *NextStep {
 			switch event.Message {
 			case "please send your email":
 				return Goto(sendEmail)
 			}
-
 			return DefaultHandler()(event)
 		})
 
 	//send email to bot and process response
-	sendEmail = Ask(func(data Data) {
-		botChan <- "some@email.com"
-	}).OnReply(func(event *Event) *NextStep {
-		switch event.Message {
-		case "please send your password":
-			return Goto(sendPassword)
-		}
-		return DefaultHandler()(event)
-	})
+	sendEmail =
+		Ask(func(data Data) {
+			botChan <- "some@email.com"
+		}).OnReply(func(event *Event) *NextStep {
+			switch event.Message {
+			case "please send your password":
+				return Goto(sendPassword)
+			}
+			return DefaultHandler()(event)
+		})
 
 	//send password to bot and stop the flow
-	sendPassword = Ask(func(data Data) {
-		botChan <- "some password"
-	}).OnReply(func(event *Event) *NextStep {
-		return End()
-	})
+	sendPassword =
+		Ask(func(data Data) {
+			botChan <- "some password"
+		}).OnReply(func(event *Event) *NextStep {
+			return End()
+		})
 
 	return Start(askRegister)
 }
@@ -107,8 +107,8 @@ func main() {
 			//receive massage from user and redirect it to bot
 			case toBot := <-botChan:
 				bot.Send(toBot)
+			//receive massage from bot and redirect it to user
 			case toHuman := <-humanChan:
-				//receive massage from bot and redirect it to user
 				human.Send(toHuman)
 
 			}
