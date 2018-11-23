@@ -1,5 +1,7 @@
 package flow
 
+import "fmt"
+
 type Data interface{}
 type Message interface{}
 
@@ -21,9 +23,10 @@ type ask struct {
 }
 
 type Flow struct {
-	askChan      chan *Step
-	replyChan    chan Message
-	completeData chan Data
+	askChan     chan *Step
+	replyChan   chan Message
+	initialStep *Step
+	initialData Data
 }
 
 func Ask(askFn askFunction) *Step {
@@ -54,18 +57,35 @@ func (nextStep *NextStep) Using(data Data) *NextStep {
 
 func DefaultHandler() ReplyFunction {
 	return func(msg Message, data Data) *NextStep {
-		panic("Oooops. Something went wrong. Define your own default ReplyFunction")
+		errorMassage := fmt.Sprintf("Oooops. Something went wrong. Define your own default ReplyFunction.\nMessage: %q. Data: %q", msg, data)
+		panic(errorMassage)
 	}
 }
 
-func StartWithData(initialStep *Step, initialData Data) *Flow {
+func NewFlowWithData(initialStep *Step, initialData Data) *Flow {
 	flow := &Flow{
-		askChan:      make(chan *Step),
-		replyChan:    make(chan Message),
-		completeData: make(chan Data),
+		askChan:     make(chan *Step, 1),
+		replyChan:   make(chan Message, 1),
+		initialStep: initialStep,
+		initialData: initialData,
 	}
+	return flow
+}
+
+func NewFlow(initialStep *Step) *Flow {
+	return NewFlowWithData(initialStep, nil)
+}
+
+func (flow *Flow) Send(message Message) {
+	go func() {
+		flow.replyChan <- message
+	}()
+}
+
+func (flow *Flow) Start() chan Data {
+	collectedData := make(chan Data, 1)
 	processor := func() {
-		var currentData = initialData
+		var currentData = flow.initialData
 		for {
 			step := <-flow.askChan
 			if step.askFn != nil {
@@ -73,7 +93,7 @@ func StartWithData(initialStep *Step, initialData Data) *Flow {
 			}
 			if step.replyFn == nil {
 				go func() {
-					flow.completeData <- currentData
+					collectedData <- currentData
 				}()
 				return
 			}
@@ -84,7 +104,7 @@ func StartWithData(initialStep *Step, initialData Data) *Flow {
 			}
 			if nextStep.step == nil {
 				go func() {
-					flow.completeData <- currentData
+					collectedData <- currentData
 				}()
 				return
 			}
@@ -94,24 +114,6 @@ func StartWithData(initialStep *Step, initialData Data) *Flow {
 		}
 	}
 	go processor()
-	flow.askChan <- initialStep
-	return flow
-}
-
-func Start(initialStep *Step) *Flow {
-	return StartWithData(initialStep, nil)
-}
-
-func (flow *Flow) Send(message Message) {
-	go func() {
-		flow.replyChan <- message
-	}()
-}
-
-func (flow *Flow) DataSync() Data {
-	return <-flow.DataAsync()
-}
-
-func (flow *Flow) DataAsync() chan Data {
-	return flow.completeData
+	flow.askChan <- flow.initialStep
+	return collectedData
 }
