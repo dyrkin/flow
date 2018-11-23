@@ -1,19 +1,14 @@
-package conversation
+package flow
 
 type Data interface{}
 type Message interface{}
 
-type ReplyFunction func(event *Event) *NextStep
+type ReplyFunction func(msg Message, data Data) *NextStep
 type askFunction func(data Data)
 
 type NextStep struct {
 	step *Step
 	data Data
-}
-
-type Event struct {
-	Message Message
-	Data    Data
 }
 
 type Step struct {
@@ -23,6 +18,12 @@ type Step struct {
 
 type ask struct {
 	askFn askFunction
+}
+
+type Flow struct {
+	askChan      chan *Step
+	replyChan    chan Message
+	completeData chan Data
 }
 
 func Ask(askFn askFunction) *Step {
@@ -52,53 +53,65 @@ func (nextStep *NextStep) Using(data Data) *NextStep {
 }
 
 func DefaultHandler() ReplyFunction {
-	return func(event *Event) *NextStep {
+	return func(msg Message, data Data) *NextStep {
 		panic("Oooops. Something went wrong. Define your own default ReplyFunction")
 	}
 }
 
-type Conversation struct {
-	askChan chan *Step
-
-	replyChan chan Message
-}
-
-func StartWithData(initialStep *Step, initialData Data) *Conversation {
-	conversation := &Conversation{askChan: make(chan *Step), replyChan: make(chan Message)}
+func StartWithData(initialStep *Step, initialData Data) *Flow {
+	flow := &Flow{
+		askChan:      make(chan *Step),
+		replyChan:    make(chan Message),
+		completeData: make(chan Data),
+	}
 	processor := func() {
 		var currentData = initialData
 		for {
-			step := <-conversation.askChan
+			step := <-flow.askChan
 			if step.askFn != nil {
 				step.askFn(currentData)
 			}
-			reply := <-conversation.replyChan
 			if step.replyFn == nil {
+				go func() {
+					flow.completeData <- currentData
+				}()
 				return
 			}
-			nextStep := step.replyFn(&Event{reply, currentData})
+			reply := <-flow.replyChan
+			nextStep := step.replyFn(reply, currentData)
 			if nextStep.data != nil {
 				currentData = nextStep.data
 			}
 			if nextStep.step == nil {
+				go func() {
+					flow.completeData <- currentData
+				}()
 				return
 			}
 			go func() {
-				conversation.askChan <- nextStep.step
+				flow.askChan <- nextStep.step
 			}()
 		}
 	}
 	go processor()
-	conversation.askChan <- initialStep
-	return conversation
+	flow.askChan <- initialStep
+	return flow
 }
 
-func Start(initialStep *Step) *Conversation {
+func Start(initialStep *Step) *Flow {
 	return StartWithData(initialStep, nil)
 }
 
-func (conversation *Conversation) Send(message Message) {
+func (flow *Flow) Send(message Message) {
 	go func() {
-		conversation.replyChan <- message
+		flow.replyChan <- message
 	}()
+}
+
+func (flow *Flow) DataSync() Data {
+	return <-flow.DataAsync()
+}
+
+func (flow *Flow) DataAsync() chan Data {
+	return flow.completeData
 }

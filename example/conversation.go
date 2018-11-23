@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	. "github.com/dyrkin/conversation"
+	. "github.com/dyrkin/flow"
 )
 
 type UserData struct {
@@ -12,28 +12,28 @@ type UserData struct {
 }
 
 //bot emulator
-func newBot(humanChan chan string) *Conversation {
+func newBot(humanChan chan string) *Flow {
 	var awaitCommand *Step
 	var askEmail *Step
 	var askPassword *Step
 
 	//wait for command from user
 	awaitCommand =
-		OnReply(func(event *Event) *NextStep {
-			switch event.Message {
+		OnReply(func(msg Message, data Data) *NextStep {
+			switch msg {
 			case "register":
 				return Goto(askEmail).Using(&UserData{})
 			}
-			return DefaultHandler()(event)
+			return DefaultHandler()(msg, data)
 		})
 
 	//ask email
 	askEmail =
 		Ask(func(data Data) {
 			humanChan <- "please send your email"
-		}).OnReply(func(event *Event) *NextStep {
-			email := event.Message.(string)
-			userData := event.Data.(*UserData)
+		}).OnReply(func(msg Message, data Data) *NextStep {
+			email := msg.(string)
+			userData := data.(*UserData)
 			userData.login = email
 			return Goto(askPassword)
 		})
@@ -42,11 +42,10 @@ func newBot(humanChan chan string) *Conversation {
 	askPassword =
 		Ask(func(data Data) {
 			humanChan <- "please send your password"
-		}).OnReply(func(event *Event) *NextStep {
-			password := event.Message.(string)
-			userData := event.Data.(*UserData)
+		}).OnReply(func(msg Message, data Data) *NextStep {
+			password := msg.(string)
+			userData := data.(*UserData)
 			userData.password = password
-			fmt.Printf("Complete data: %q", userData)
 			return End().Using(userData)
 		})
 
@@ -54,7 +53,7 @@ func newBot(humanChan chan string) *Conversation {
 }
 
 //user emulator
-func newHuman(botChan chan string) *Conversation {
+func newHuman(botChan chan string) *Flow {
 	var askRegister *Step
 	var sendEmail *Step
 	var sendPassword *Step
@@ -63,24 +62,24 @@ func newHuman(botChan chan string) *Conversation {
 	askRegister =
 		Ask(func(data Data) {
 			botChan <- "register"
-		}).OnReply(func(event *Event) *NextStep {
-			switch event.Message {
+		}).OnReply(func(msg Message, data Data) *NextStep {
+			switch msg {
 			case "please send your email":
 				return Goto(sendEmail)
 			}
-			return DefaultHandler()(event)
+			return DefaultHandler()(msg, data)
 		})
 
 	//send email to bot and process response
 	sendEmail =
 		Ask(func(data Data) {
 			botChan <- "some@email.com"
-		}).OnReply(func(event *Event) *NextStep {
-			switch event.Message {
+		}).OnReply(func(msg Message, data Data) *NextStep {
+			switch msg {
 			case "please send your password":
 				return Goto(sendPassword)
 			}
-			return DefaultHandler()(event)
+			return DefaultHandler()(msg, data)
 		})
 
 	//just send a password to the bot and stop the flow
@@ -113,6 +112,9 @@ func main() {
 		}
 	}()
 
-	var in string
-	fmt.Scanln(&in)
+	//lock until the end of human flow
+	human.DataSync()
+	//lock until the end of bot flow
+	completeData := bot.DataSync()
+	fmt.Printf("Complete data: %q\n", completeData)
 }

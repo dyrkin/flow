@@ -1,1 +1,1 @@
-module github.com/dyrkin/conversation
+module github.com/dyrkin/flow
