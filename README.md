@@ -58,7 +58,7 @@ func newBot(humanChan chan string) *Flow {
 			return End().Using(humanData)
 		})
 
-	return NewFlow(awaitCommand)
+	return New(awaitCommand)
 }
 
 func main() {
@@ -90,7 +90,7 @@ func main() {
 
 The basic strategy is to define Steps and specifying initial step while instantiating the Flow:
 
-* `NewFlow(<initial step>)` creates a flow with the initial step specified.
+* `New(<initial step>)` creates a flow with the initial step specified.
 * `Start()` starts the flow and returns a `chan` where the collected data will be sent after end of the flow.
 * `Ask(<data fn>)` executes immediately after `Start()` is called.
 * `OnReply(<message fn>)` executes when a data from the user is received.

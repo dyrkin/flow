@@ -56,7 +56,7 @@ func newBot(humanChan chan string) *Flow {
 			return End().Using(humanData)
 		})
 
-	return NewFlow(awaitCommand)
+	return New(awaitCommand)
 }
 
 //human emulator
@@ -95,7 +95,7 @@ func newHuman(botChan chan string) *Flow {
 			botChan <- "some password"
 		})
 
-	return NewFlow(askRegister)
+	return New(askRegister)
 }
 
 func main() {

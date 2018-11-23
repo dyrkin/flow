@@ -62,7 +62,7 @@ func DefaultHandler() ReplyFunction {
 	}
 }
 
-func NewFlowWithData(initialStep *Step, initialData Data) *Flow {
+func NewWithData(initialStep *Step, initialData Data) *Flow {
 	flow := &Flow{
 		askChan:     make(chan *Step, 1),
 		replyChan:   make(chan Message, 1),
@@ -72,8 +72,8 @@ func NewFlowWithData(initialStep *Step, initialData Data) *Flow {
 	return flow
 }
 
-func NewFlow(initialStep *Step) *Flow {
-	return NewFlowWithData(initialStep, nil)
+func New(initialStep *Step) *Flow {
+	return NewWithData(initialStep, nil)
 }
 
 func (flow *Flow) Send(message Message) {
